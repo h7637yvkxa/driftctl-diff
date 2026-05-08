@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/user/driftctl-diff/internal/diff"
+	"github.com/owner/driftctl-diff/internal/diff"
 )
 
-// Format enumerates supported output formats.
+// Format is the output format identifier.
 type Format string
 
 const (
@@ -16,30 +16,31 @@ const (
 	FormatMarkdown Format = "markdown"
 	FormatCSV      Format = "csv"
 	FormatHTML     Format = "html"
+	FormatSARIF    Format = "sarif"
 )
 
-// Formatter writes a diff result in the requested format.
+// Formatter writes a diff.Result to an io.Writer in the requested format.
 type Formatter struct {
 	format Format
 }
 
 // NewFormatter creates a Formatter for the given format string.
-// An empty string defaults to text.
+// Returns an error if the format is not recognised.
 func NewFormatter(format string) (*Formatter, error) {
-	if format == "" {
-		format = string(FormatText)
-	}
-	switch Format(format) {
-	case FormatText, FormatJSON, FormatMarkdown, FormatCSV, FormatHTML:
-		return &Formatter{format: Format(format)}, nil
+	f := Format(format)
+	switch f {
+	case FormatText, FormatJSON, FormatMarkdown, FormatCSV, FormatHTML, FormatSARIF:
+		return &Formatter{format: f}, nil
 	default:
-		return nil, fmt.Errorf("unsupported format %q; choose text, json, markdown, csv, or html", format)
+		return nil, fmt.Errorf("unsupported format %q; valid options: text, json, markdown, csv, html, sarif", format)
 	}
 }
 
 // Write renders result to w using the configured format.
 func (f *Formatter) Write(w io.Writer, result diff.Result) error {
 	switch f.format {
+	case FormatText:
+		return writeText(w, result)
 	case FormatJSON:
 		return writeJSON(w, result)
 	case FormatMarkdown:
@@ -48,7 +49,9 @@ func (f *Formatter) Write(w io.Writer, result diff.Result) error {
 		return writeCSV(w, result)
 	case FormatHTML:
 		return writeHTML(w, result)
+	case FormatSARIF:
+		return writeSARIF(w, result)
 	default:
-		return writeText(w, result)
+		return fmt.Errorf("unsupported format %q", f.format)
 	}
 }

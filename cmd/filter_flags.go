@@ -29,27 +29,29 @@ func registerFilterFlags(cmd *cobra.Command) {
 		"Comma-separated list of resource names to exclude")
 }
 
+// splitCSV splits a comma-separated string into a trimmed, non-empty slice.
+// Returns nil if the input string is empty.
+func splitCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
 // buildFilterOptions converts the raw flag strings into a filter.Options struct.
 func buildFilterOptions() filter.Options {
-	split := func(s string) []string {
-		if s == "" {
-			return nil
-		}
-		parts := strings.Split(s, ",")
-		result := make([]string, 0, len(parts))
-		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if p != "" {
-				result = append(result, p)
-			}
-		}
-		return result
-	}
-
 	return filter.Options{
-		IncludeTypes: split(filterFlags.includeTypes),
-		ExcludeTypes: split(filterFlags.excludeTypes),
-		IncludeNames: split(filterFlags.includeNames),
-		ExcludeNames: split(filterFlags.excludeNames),
+		IncludeTypes: splitCSV(filterFlags.includeTypes),
+		ExcludeTypes: splitCSV(filterFlags.excludeTypes),
+		IncludeNames: splitCSV(filterFlags.includeNames),
+		ExcludeNames: splitCSV(filterFlags.excludeNames),
 	}
 }

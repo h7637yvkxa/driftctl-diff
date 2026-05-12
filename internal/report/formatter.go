@@ -18,25 +18,30 @@ const (
 	FormatHTML     Format = "html"
 	FormatSARIF    Format = "sarif"
 	FormatJUnit    Format = "junit"
+	FormatTemplate Format = "template"
+	FormatSlack    Format = "slack"
+	FormatGitLab   Format = "gitlab"
 )
 
-// Formatter writes a diff.Result to an io.Writer in the chosen format.
+// Formatter writes a diff.Result to an io.Writer in a chosen format.
 type Formatter struct {
-	format Format
+	format       Format
+	templatePath string
 }
 
-// NewFormatter constructs a Formatter for the given format string.
-func NewFormatter(format string) (*Formatter, error) {
+// NewFormatter returns a Formatter for the given format string.
+func NewFormatter(format string, templatePath string) (*Formatter, error) {
 	f := Format(format)
 	switch f {
-	case FormatText, FormatJSON, FormatMarkdown, FormatCSV, FormatHTML, FormatSARIF, FormatJUnit:
-		return &Formatter{format: f}, nil
-	default:
-		return nil, fmt.Errorf("unsupported format %q", format)
+	case FormatText, FormatJSON, FormatMarkdown, FormatCSV,
+		FormatHTML, FormatSARIF, FormatJUnit, FormatTemplate,
+		FormatSlack, FormatGitLab:
+		return &Formatter{format: f, templatePath: templatePath}, nil
 	}
+	return nil, fmt.Errorf("unsupported format: %q", format)
 }
 
-// Write renders result to w using the configured format.
+// Write renders result to w.
 func (f *Formatter) Write(w io.Writer, result diff.Result) error {
 	switch f.format {
 	case FormatText:
@@ -53,7 +58,12 @@ func (f *Formatter) Write(w io.Writer, result diff.Result) error {
 		return writeSARIF(w, result)
 	case FormatJUnit:
 		return writeJUnit(w, result)
-	default:
-		return fmt.Errorf("unsupported format %q", f.format)
+	case FormatTemplate:
+		return writeTemplate(w, result, f.templatePath)
+	case FormatSlack:
+		return writeSlack(w, result)
+	case FormatGitLab:
+		return writeGitLab(w, result)
 	}
+	return fmt.Errorf("unsupported format: %q", f.format)
 }

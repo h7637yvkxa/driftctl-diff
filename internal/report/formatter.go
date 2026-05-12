@@ -3,6 +3,7 @@ package report
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/owner/driftctl-diff/internal/diff"
 )
@@ -11,41 +12,41 @@ import (
 type Format string
 
 const (
-	FormatText     Format = "text"
-	FormatJSON     Format = "json"
-	FormatMarkdown Format = "markdown"
-	FormatCSV      Format = "csv"
-	FormatHTML     Format = "html"
-	FormatSARIF    Format = "sarif"
-	FormatJUnit    Format = "junit"
-	FormatTemplate Format = "template"
-	FormatSlack    Format = "slack"
-	FormatGitLab   Format = "gitlab"
+	FormatText      Format = "text"
+	FormatJSON      Format = "json"
+	FormatMarkdown  Format = "markdown"
+	FormatCSV       Format = "csv"
+	FormatHTML      Format = "html"
+	FormatSARIF     Format = "sarif"
+	FormatJUnit     Format = "junit"
+	FormatTemplate  Format = "template"
+	FormatSlack     Format = "slack"
+	FormatGitLab    Format = "gitlab"
+	FormatCycloneDX Format = "cyclonedx"
 )
 
-// Formatter writes a diff.Result to an io.Writer in a chosen format.
+// Formatter writes a diff.Result in the requested format.
 type Formatter struct {
 	format       Format
 	templatePath string
 }
 
-// NewFormatter returns a Formatter for the given format string.
+// NewFormatter constructs a Formatter for the given format string.
 func NewFormatter(format string, templatePath string) (*Formatter, error) {
-	f := Format(format)
+	f := Format(strings.ToLower(strings.TrimSpace(format)))
 	switch f {
-	case FormatText, FormatJSON, FormatMarkdown, FormatCSV,
-		FormatHTML, FormatSARIF, FormatJUnit, FormatTemplate,
-		FormatSlack, FormatGitLab:
+	case FormatText, FormatJSON, FormatMarkdown, FormatCSV, FormatHTML,
+		FormatSARIF, FormatJUnit, FormatTemplate, FormatSlack, FormatGitLab,
+		FormatCycloneDX:
 		return &Formatter{format: f, templatePath: templatePath}, nil
+	default:
+		return nil, fmt.Errorf("unsupported format %q", format)
 	}
-	return nil, fmt.Errorf("unsupported format: %q", format)
 }
 
-// Write renders result to w.
+// Write renders result to w using the configured format.
 func (f *Formatter) Write(w io.Writer, result diff.Result) error {
 	switch f.format {
-	case FormatText:
-		return writeText(w, result)
 	case FormatJSON:
 		return writeJSON(w, result)
 	case FormatMarkdown:
@@ -64,6 +65,28 @@ func (f *Formatter) Write(w io.Writer, result diff.Result) error {
 		return writeSlack(w, result)
 	case FormatGitLab:
 		return writeGitLab(w, result)
+	case FormatCycloneDX:
+		return writeCycloneDX(w, result)
+	default:
+		return writeText(w, result)
 	}
-	return fmt.Errorf("unsupported format: %q", f.format)
+}
+
+func writeText(w io.Writer, result diff.Result) error {
+	if !result.HasDrift() {
+		_, err := fmt.Fprintln(w, "No drift detected.")
+		return err
+	}
+	for key := range result.Added {
+		fmt.Fprintf(w, "[+] %s\n", key)
+	}
+	for key := range result.Removed {
+		fmt.Fprintf(w, "[-] %s\n", key)
+	}
+	for key, changes := range result.Changed {
+		for _, ch := range changes {
+			fmt.Fprintf(w, "[~] %s  %s: %v -> %v\n", key, ch.Attribute, ch.OldValue, ch.NewValue)
+		}
+	}
+	return nil
 }
